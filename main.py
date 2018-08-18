@@ -125,8 +125,8 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param learning_rate: TF Placeholder for learning rate
     """
     session_id = str(uuid.uuid4())[:6]
+    sess.run(tf.global_variables_initializer())
     for epoch in range(epochs):
-        sess.run(tf.global_variables_initializer())
         print("epoch:", epochs)
         i = 0
         for images, labels in get_batches_fn(batch_size):
