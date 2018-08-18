@@ -56,6 +56,7 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :param num_classes: Number of classes to classify
     :return: The Tensor for the last layer of output
     """
+    l2_scale = 1e-3
 
     # scale the jump layers
     vgg_layer3_out_scaled = tf.multiply(vgg_layer3_out, 0.0001, name="vgg_layer3_out_scaled")
@@ -67,20 +68,22 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     vgg_layer3_conv1x1_out = tf.layers.conv2d(vgg_layer3_out_scaled, num_classes, 1, 1, padding="SAME")
 
     # scale by 2
-    decoder_layer1_out = tf.layers.conv2d_transpose(vgg_layer7_conv1x1_out, num_classes, 4, 2, padding="SAME")
+    decoder_layer1_out = tf.layers.conv2d_transpose(vgg_layer7_conv1x1_out, num_classes, 4, 2, padding="SAME",
+                                kernel_regularizer= tf.contrib.layers.l2_regularizer(l2_scale))
 
     # add jump connections
     decoder_layer1_out = tf.add(decoder_layer1_out, vgg_layer4_conv1x1_out)
 
     # scale by 2
-    decoder_layer2_out = tf.layers.conv2d_transpose(decoder_layer1_out, num_classes, 4, 2)
+    decoder_layer2_out = tf.layers.conv2d_transpose(decoder_layer1_out, num_classes, 4, 2, padding="SAME",
+                                kernel_regularizer= tf.contrib.layers.l2_regularizer(l2_scale))
 
     # add jump connections
     decoder_layer2_out = tf.add(decoder_layer2_out, vgg_layer3_conv1x1_out)
 
     # scale by 8
-    decoder_layer3_out = tf.layers.conv2d_transpose(decoder_layer2_out, num_classes, 16, 8)
-    print(tf.shape(decoder_layer3_out))
+    decoder_layer3_out = tf.layers.conv2d_transpose(decoder_layer2_out, num_classes, 16, 8, padding="SAME",
+                                kernel_regularizer= tf.contrib.layers.l2_regularizer(l2_scale))
 
     return decoder_layer3_out
 tests.test_layers(layers)
@@ -95,11 +98,13 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     :param num_classes: Number of classes to classify
     :return: Tuple of (logits, train_op, cross_entropy_loss)
     """
+    reg_constant = 0.01
     logits = tf.reshape(nn_last_layer, (-1, num_classes))
     cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=correct_label, logits=logits)
     loss_operation = tf.reduce_mean(cross_entropy)
     optimizer = tf.train.AdamOptimizer(learning_rate = learning_rate)
-    training_operation = optimizer.minimize(loss_operation)
+    reg_losses = tf.losses.get_regularization_losses()
+    training_operation = optimizer.minimize(loss_operation + reg_constant * sum(reg_losses))
 
     return logits, training_operation, loss_operation
 tests.test_optimize(optimize)
@@ -122,10 +127,16 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     """
     # TODO: Implement function
     for epoch in range(epochs):
+        sess.run(tf.global_variables_initializer())
         print("epoch:", epochs)
         for images, labels in get_batches_fn(batch_size):
             print("images:", images.shape, "labels:", labels.shape)
-            sess.run(train_op, feed_dict={input_image: images, correct_label: labels, keep_prob: 0.045, learning_rate:0.0001})
+            feed_dict = {input_image: images, correct_label: labels, keep_prob: 0.045, learning_rate:0.0001}
+            sess.run(train_op, feed_dict=feed_dict)
+
+            # evaluate the loss
+            loss = sess.run(cross_entropy_loss, feed_dict=feed_dict)
+            print(loss)
 tests.test_train_nn(train_nn)
 
 
@@ -175,9 +186,8 @@ def run():
                  keep_prob,
                  learning_rate)
 
-
         # TODO: Save inference data using helper.save_inference_samples
-        #  helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
+        helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
 
         # OPTIONAL: Apply the trained model to a video
 
