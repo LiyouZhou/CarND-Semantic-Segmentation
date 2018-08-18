@@ -6,7 +6,7 @@ import helper
 import warnings
 from distutils.version import LooseVersion
 import project_tests as tests
-
+import uuid
 
 # Check TensorFlow Version
 assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), 'Please use TensorFlow version 1.0 or newer.  You are using {}'.format(tf.__version__)
@@ -126,9 +126,11 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param learning_rate: TF Placeholder for learning rate
     """
     # TODO: Implement function
+    session_id = str(uuid.uuid4())[:6]
     for epoch in range(epochs):
         sess.run(tf.global_variables_initializer())
         print("epoch:", epochs)
+        i = 0
         for images, labels in get_batches_fn(batch_size):
             print("images:", images.shape, "labels:", labels.shape)
             feed_dict = {input_image: images, correct_label: labels, keep_prob: 0.045, learning_rate:0.0001}
@@ -137,6 +139,11 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
             # evaluate the loss
             loss = sess.run(cross_entropy_loss, feed_dict=feed_dict)
             print(loss)
+
+            # write log loss to a file
+            i += 1
+            with open("training_log.txt", "a+") as fd:
+                fd.write("{}, {}, {}, {}\n".format(session_id, epoch, i, loss))
 tests.test_train_nn(train_nn)
 
 
@@ -146,7 +153,7 @@ def run():
     data_dir = './data'
     runs_dir = './runs'
     epochs = 1
-    batch_size = 32
+    batch_size = 2
     rate = 0.001
     # Path to vgg model
     vgg_path = os.path.join(data_dir, 'vgg')
