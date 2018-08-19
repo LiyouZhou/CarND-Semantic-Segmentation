@@ -163,7 +163,7 @@ def run():
     helper.maybe_download_pretrained_vgg(data_dir)
 
     with tf.Session() as sess:
-        # TODO: Build NN using load_vgg, layers, and optimize function
+        # Build NN using load_vgg, layers, and optimize function
         input_image, keep_prob, layer3_out, layer4_out, layer7_out = load_vgg(sess, vgg_path)
         layers_output = layers(layer3_out, layer4_out, layer7_out, num_classes)
 
